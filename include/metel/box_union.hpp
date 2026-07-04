@@ -12,7 +12,6 @@
 
 #include <utility>
 
-#include "metel/meta.hpp"
 #include "metel/box.hpp"
 
 namespace metel {

@@ -16,8 +16,6 @@ target_include_directories(metellib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
 
 target_link_libraries(metellib PUBLIC
     ${CMAKE_THREAD_LIBS_INIT}
-    anyanylib
-    kelcorolib
     zallib
 )
 

@@ -6,17 +6,19 @@
 #include <utility>
 #include <cassert>
 #include <optional>
+#include <initializer_list>
 
 #include <zal/zal.hpp>
 
 #include "metel/macro.hpp"
+#include "metel/meta.hpp"
 
 namespace metel {
 
 // optional, но позволяет быть T неполным типом
 template <typename T>
 struct METEL_TRIVIAL_ABI box {
-  static_assert(std::is_same_v<std::decay_t<T>, T>);
+  static_assert(is_decayed_v<T>);
   using value_type = T;
 
  private:
@@ -25,7 +27,7 @@ struct METEL_TRIVIAL_ABI box {
  public:
   box() = default;
 
-  constexpr box(std::nullptr_t) {
+  constexpr box(std::nullptr_t) noexcept {
   }
   constexpr box(std::nullopt_t) noexcept : box(nullptr) {
   }
@@ -33,7 +35,9 @@ struct METEL_TRIVIAL_ABI box {
     reset();
   }
 
-  constexpr box(const box& other) {
+  constexpr box(const box& other)
+    requires(std::is_copy_constructible_v<T>)
+  {
     if (!other.ptr)
       return;
     ptr = new T(*other.ptr);
@@ -41,7 +45,9 @@ struct METEL_TRIVIAL_ABI box {
   constexpr box(box&& other) noexcept : ptr(std::exchange(other.ptr, nullptr)) {
   }
 
-  constexpr box& operator=(const box& other) {
+  constexpr box& operator=(const box& other)
+    requires(std::is_copy_constructible_v<T>)
+  {
     *this = box(other);
     return *this;
   }
@@ -60,7 +66,7 @@ struct METEL_TRIVIAL_ABI box {
   }
 
   template <typename U = T>
-  constexpr box& operator=(U&& v) noexcept(std::is_nothrow_constructible_v<T, U&&>)
+  constexpr box& operator=(U&& v)
     requires(!std::is_same_v<box, std::decay_t<U>> && std::is_constructible_v<T, U &&>)
   {
     emplace(std::forward<U>(v));
@@ -76,15 +82,13 @@ struct METEL_TRIVIAL_ABI box {
 
   template <typename U = T>
     requires(!std::is_same_v<box, std::decay_t<U>> && std::is_constructible_v<T, U &&>)
-  constexpr explicit(!std::is_convertible_v<U&&, T>)
-      box(U&& v) noexcept(std::is_nothrow_constructible_v<T, U&&>)
-      : ptr(new T(std::forward<U>(v))) {
+  constexpr explicit(!std::is_convertible_v<U&&, T>) box(U&& v) : ptr(new T(std::forward<U>(v))) {
   }
 
   template <typename U, typename... Args>
   constexpr value_type& emplace(std::initializer_list<U> list, Args&&... args) {
     // avoid recursion
-    return emplace<std::initializer_list<U>, Args&&...>(std::move(list), std::forward<Args>(args)...);
+    return emplace<std::initializer_list<U>, Args...>(std::move(list), std::forward<Args>(args)...);
   }
 
   // if exception thrown from T constructor, then has_value() == false
@@ -133,12 +137,20 @@ struct METEL_TRIVIAL_ABI box {
   }
 
   template <typename U>
+  constexpr T value_or(U&& v) & {
+    return has_value() ? T(**this) : static_cast<T>(std::forward<U>(v));
+  }
+  template <typename U>
   constexpr T value_or(U&& v) const& {
     return has_value() ? T(**this) : static_cast<T>(std::forward<U>(v));
   }
 
   template <typename U>
   constexpr T value_or(U&& v) && {
+    return has_value() ? T(std::move(**this)) : static_cast<T>(std::forward<U>(v));
+  }
+  template <typename U>
+  constexpr T value_or(U&& v) const&& {
     return has_value() ? T(std::move(**this)) : static_cast<T>(std::forward<U>(v));
   }
 
@@ -207,11 +219,19 @@ struct METEL_TRIVIAL_ABI box {
   constexpr bool operator==(std::nullopt_t) const noexcept {
     return *this == nullptr;
   }
-  friend constexpr std::strong_ordering operator<=>(const box& l, const box& r) noexcept {
-    return l && r ? *l <=> *r : bool(l) <=> bool(r);
+
+  // noexcept на операторах сравнения безусловный, так как бросающее исключение сравнение это безумие
+  // а проверка noexcept добавляет нетривиальных ошибок при использовании из-за возникающих рекурсий и тд
+  friend constexpr auto operator<=>(const box& l, const box& r) noexcept
+    requires(std::three_way_comparable<T>)
+  {
+    // compare_three_way_result_t спрятано внутрь, чтобы не обваливать ещё при проверке в возвращаемом типе
+    return std::compare_three_way_result_t<T>(l && r ? *l <=> *r : bool(l) <=> bool(r));
   }
 
-  friend constexpr bool operator==(const box& l, const box& r) noexcept {
+  friend constexpr bool operator==(const box& l, const box& r) noexcept
+    requires(std::equality_comparable<T>)
+  {
     return l && r ? *l == *r : !l && !r;
   }
 
