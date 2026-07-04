@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "metel/macro.hpp"
+
 namespace metel {
 
 template <typename T>
@@ -16,30 +18,30 @@ constexpr decltype(auto) visit_index(auto&& f, size_t i) {
   static_assert(Max <= VISIT_INDEX_MAX);
   assert(i <= VISIT_INDEX_MAX);
   switch (i) {
-#define $TGBM_SWITCH_CASE(INDEX)             \
+#define $METEL_SWITCH_CASE(INDEX)            \
   case INDEX: {                              \
     if constexpr (INDEX <= Max) {            \
       return f.template operator()<INDEX>(); \
     } else {                                 \
-      unreachable();                         \
+      metel::unreachable();                  \
     }                                        \
   }
-#define $TGBM_SWITCH_CASE4(I) \
-  $TGBM_SWITCH_CASE(I) $TGBM_SWITCH_CASE(I + 1) $TGBM_SWITCH_CASE(I + 2) $TGBM_SWITCH_CASE(I + 3)
-#define $TGBM_SWITCH_CASE8(I) $TGBM_SWITCH_CASE4(I) $TGBM_SWITCH_CASE4(I + 4)
-#define $TGBM_SWITCH_CASE16(I) $TGBM_SWITCH_CASE8(I) $TGBM_SWITCH_CASE8(I + 8)
-#define $TGBM_SWITCH_CASE32(I) $TGBM_SWITCH_CASE16(I) $TGBM_SWITCH_CASE16(I + 16)
-#define $TGBM_SWITCH_CASE64(I) $TGBM_SWITCH_CASE32(I) $TGBM_SWITCH_CASE32(I + 32)
-#define $TGBM_SWITCH_CASE128(I) $TGBM_SWITCH_CASE64(I) $TGBM_SWITCH_CASE64(I + 64)
-    $TGBM_SWITCH_CASE128(0);
+#define $METEL_SWITCH_CASE4(I) \
+  $METEL_SWITCH_CASE(I) $METEL_SWITCH_CASE(I + 1) $METEL_SWITCH_CASE(I + 2) $METEL_SWITCH_CASE(I + 3)
+#define $METEL_SWITCH_CASE8(I) $METEL_SWITCH_CASE4(I) $METEL_SWITCH_CASE4(I + 4)
+#define $METEL_SWITCH_CASE16(I) $METEL_SWITCH_CASE8(I) $METEL_SWITCH_CASE8(I + 8)
+#define $METEL_SWITCH_CASE32(I) $METEL_SWITCH_CASE16(I) $METEL_SWITCH_CASE16(I + 16)
+#define $METEL_SWITCH_CASE64(I) $METEL_SWITCH_CASE32(I) $METEL_SWITCH_CASE32(I + 32)
+#define $METEL_SWITCH_CASE128(I) $METEL_SWITCH_CASE64(I) $METEL_SWITCH_CASE64(I + 64)
+    $METEL_SWITCH_CASE128(0);
   }  // end switch
-  unreachable();
-#undef $TGBM_SWITCH_CASE
-#undef $TGBM_SWITCH_CASE4
-#undef $TGBM_SWITCH_CASE8
-#undef $TGBM_SWITCH_CASE16
-#undef $TGBM_SWITCH_CASE32
-#undef $TGBM_SWITCH_CASE64
+  metel::unreachable();
+#undef $METEL_SWITCH_CASE
+#undef $METEL_SWITCH_CASE4
+#undef $METEL_SWITCH_CASE8
+#undef $METEL_SWITCH_CASE16
+#undef $METEL_SWITCH_CASE32
+#undef $METEL_SWITCH_CASE64
 }
 
 template <typename... Foos>
