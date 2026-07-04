@@ -1,4 +1,4 @@
-#include <moko3./moko3.hpp>
+#include <moko3/moko3.hpp>
 #include "metel/box.hpp"
 
 struct noncomparable {
