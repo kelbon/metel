@@ -21,8 +21,7 @@ TEST("box") {
   static_assert(std::three_way_comparable<decltype(b), std::strong_ordering>);
   static_assert(!std::three_way_comparable<box<noncomparable>, std::strong_ordering>);
   static_assert(std::is_copy_constructible_v<decltype(b)>);
-  static_assert(!std::is_copy_constructible_v<box<std::unique_ptr<int>>>);
-  static_assert(!std::is_copy_assignable_v<box<std::unique_ptr<int>>>);
+
   struct nonmove {
     nonmove() {
     }

@@ -35,9 +35,8 @@ struct METEL_TRIVIAL_ABI box {
     reset();
   }
 
-  constexpr box(const box& other)
-    requires(std::is_copy_constructible_v<T>)
-  {
+  // no requires copy constructible to not create bad errors in variant<box> etc
+  constexpr box(const box& other) {
     if (!other.ptr)
       return;
     ptr = new T(*other.ptr);
@@ -45,9 +44,7 @@ struct METEL_TRIVIAL_ABI box {
   constexpr box(box&& other) noexcept : ptr(std::exchange(other.ptr, nullptr)) {
   }
 
-  constexpr box& operator=(const box& other)
-    requires(std::is_copy_constructible_v<T>)
-  {
+  constexpr box& operator=(const box& other) {
     *this = box(other);
     return *this;
   }
