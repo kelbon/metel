@@ -117,6 +117,52 @@ template <typename T, typename... Types>
 concept oneof_types = (std::same_as<T, Types> || ...);
 
 template <typename... Types>
-struct typelist {};
+struct typelist {
+  static constexpr inline size_t size = sizeof...(Types);
+
+  template <typename T>
+  static constexpr bool contains() {
+    return (std::is_same_v<Types, T> || ...);
+  }
+  template <typename T>
+  static constexpr bool contains(std::type_identity<T>) {
+    return contains_type<T, Types...>();
+  }
+  template <typename... Ts>
+  static constexpr bool contains_any(typelist<Ts...>) {
+    return (contains<Ts>() || ...);
+  }
+  template <typename... Ts>
+  static constexpr bool contains_all(typelist<Ts...>) {
+    return (contains<Ts>() && ...);
+  }
+
+  template <typename... Ts>
+  static constexpr auto merge(typelist<Ts...>) {
+    return typelist<Types...>{} +
+           (typelist<>{} + ... + std::conditional_t<contains<Ts>(), typelist<>, typelist<Ts>>{});
+  }
+
+  template <typename... Ts>
+  constexpr auto operator|(typelist<Ts...> l) const noexcept {
+    return merge(l);
+  }
+
+  template <typename... Ts>
+  constexpr auto operator+(typelist<Ts...>) const noexcept -> typelist<Types..., Ts...> {
+    return {};
+  }
+
+  template <typename... Ts>
+  constexpr bool operator==(const typelist<Ts...>&) const noexcept {
+    return std::is_same_v<typelist<Ts...>, typelist<Types...>>;
+  }
+};
+
+template <typename>
+struct is_typelist : std::false_type {};
+
+template <typename... Ts>
+struct is_typelist<typelist<Ts...>> : std::true_type {};
 
 }  // namespace metel
