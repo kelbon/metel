@@ -169,6 +169,35 @@ TEST("iterator / foreach_node [basic]") {
   REQUIRE(MoveOnly::alive_count.load() == 0);
 }
 
+TEST("erase_if [basic]") {
+  append_only_lockfree_list<int> list;
+  REQUIRE(list.empty());
+  list.erase_if([](int) noexcept { return true; });
+  REQUIRE(list.empty());
+  list.erase_if([](int) noexcept { return false; });
+  REQUIRE(list.empty());
+  for (int i = 0; i < 10; ++i)
+    list.push_back(i);
+  std::vector<int> expected(10);
+  std::iota(expected.begin(), expected.end(), 0);
+  REQUIRE(collect(list) == expected);
+  list.erase_if([](int) noexcept { return false; });
+  REQUIRE(collect(list) == expected);
+  auto cond1 = [](const int& x) noexcept { return x > 7; };
+  std::erase_if(expected, cond1);
+  list.erase_if(cond1);
+  REQUIRE(collect(list) == expected);
+
+  auto cond2 = [](const int& x) noexcept { return x < 3; };
+  std::erase_if(expected, cond1);
+  list.erase_if(cond1);
+  REQUIRE(collect(list) == expected);
+
+  auto cond3 = [](const int& x) noexcept { return true; };
+  list.erase_if(cond3);
+  REQUIRE(list.empty());
+}
+
 // =====================================================================
 // Часть 2: многопоточные тесты
 // =====================================================================

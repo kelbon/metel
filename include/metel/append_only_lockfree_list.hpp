@@ -53,7 +53,7 @@ struct append_only_lockfree_list_node {
 };
 
 // локфри список
-// элементы в список должны только добавляться
+// параллельно элементы в список можно только добавлять
 // пользователь сам должен гарантировать, что во время вызова
 // деструктора нет параллельного использования
 template <typename T>
@@ -118,6 +118,34 @@ struct append_only_lockfree_list {
 
   static std::default_sentinel_t end() noexcept {
     return std::default_sentinel;
+  }
+
+  // для поддержки старых алгоритмов
+  static iterator end_iterator() noexcept {
+    return iterator{};
+  }
+
+  // удаляет ноды для значения которых cond(value) == true
+  // pre: никто не использует *this параллельно
+  void erase_if(auto&& cond) {
+    static_assert(noexcept(cond(std::declval<T>())));
+    node_type* t = top.load(std::memory_order::acquire);
+    node_type* new_top = nullptr;
+    node_type* prev = nullptr;
+    while (t) {
+      auto* next = t->next.load(std::memory_order::acquire);
+      if (cond(std::as_const(t->value))) {
+        if (prev)
+          prev->next.store(next, std::memory_order::release);
+        delete t;
+      } else {
+        if (!new_top)
+          new_top = t;
+        prev = t;
+      }
+      t = next;
+    }
+    top.store(new_top, std::memory_order::release);
   }
 
   // возвращает итератор на только что вставленную ноду
