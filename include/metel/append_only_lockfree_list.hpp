@@ -41,7 +41,8 @@ struct append_only_lockfree_list_node {
   }
 
   // посещает все ноды начиная с этой
-  void visit_nodes(auto&& vtor) {
+  template <typename V>
+  void visit_nodes(V&& vtor) {
     auto* n = this;
     while (n) {
       // кеш до функции которая может удалить ноду
@@ -102,9 +103,61 @@ struct append_only_lockfree_list {
     }
   };
 
+  struct const_iterator {
+    node_type* cur = nullptr;
+
+    using value_type = T;
+    using reference = const T&;
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const T*;
+
+    // end iterator
+    const_iterator() = default;
+    explicit const_iterator(node_type* n) noexcept : cur(n) {
+    }
+    const_iterator(iterator i) noexcept : cur(i.cur) {
+    }
+    operator iterator() const noexcept {
+      return iterator(cur);
+    }
+
+    node_type* node_ptr() const noexcept {
+      return cur;
+    }
+
+    reference operator*() const noexcept {
+      return cur->value;
+    }
+    pointer operator->() const noexcept {
+      return std::addressof(cur->value);
+    }
+    const_iterator& operator++() noexcept {
+      assert(cur);
+      cur = cur->next.load(std::memory_order::acquire);
+      return *this;
+    }
+    const_iterator operator++(int) noexcept {
+      auto i = *this;
+      ++*this;
+      return i;
+    }
+    bool operator==(std::default_sentinel_t) const noexcept {
+      return cur == nullptr;
+    }
+    bool operator==(const const_iterator& other) const noexcept {
+      return cur == other.cur;
+    }
+    bool operator==(const iterator& other) const noexcept {
+      return cur == other.cur;
+    }
+  };
+
   append_only_lockfree_list() = default;
 
-  append_only_lockfree_list(append_only_lockfree_list&&) = delete;
+  // только форвард декларация, так что разрешено только RVO этого типа, но не
+  // мув
+  append_only_lockfree_list(append_only_lockfree_list&&);
   void operator=(append_only_lockfree_list&&) = delete;
 
   ~append_only_lockfree_list() {
@@ -114,6 +167,9 @@ struct append_only_lockfree_list {
   // есть вероятность не увидеть некоторые значения, если параллельно вызываются push_back/push_back_list
   iterator begin() noexcept {
     return iterator(top.load(std::memory_order::acquire));
+  }
+  const_iterator begin() const noexcept {
+    return const_iterator(const_cast<append_only_lockfree_list*>(this)->begin());
   }
 
   static std::default_sentinel_t end() noexcept {
@@ -127,7 +183,8 @@ struct append_only_lockfree_list {
 
   // удаляет ноды для значения которых cond(value) == true
   // pre: никто не использует *this параллельно
-  void erase_if(auto&& cond) {
+  template <typename C>
+  void erase_if(C&& cond) {
     static_assert(noexcept(cond(std::declval<T>())));
     node_type* t = top.load(std::memory_order::acquire);
     node_type* new_top = nullptr;
@@ -165,7 +222,7 @@ struct append_only_lockfree_list {
   // то же что и push_back, но  'hint' помогает быстрее найти последнюю ноду
   // pre: hint != end(), hint из этого же списка
   template <typename... Args>
-  iterator push_back_hint(iterator hint, Args&&... args) {
+  iterator push_back_hint(const_iterator hint, Args&&... args) {
     assert(hint != end());
     node_type* newnode = new node_type(nullptr, T(std::forward<Args>(args)...));
     hint.node_ptr()->attach_after_last(newnode);
@@ -191,7 +248,8 @@ struct append_only_lockfree_list {
   }
 
   // есть вероятность не увидеть некоторые ноды, если параллельно вызываются push_back/push_back_list
-  void foreach_node(auto&& vtor) {
+  template <typename V>
+  void foreach_node(V&& vtor) {
     auto* t = top.load(std::memory_order::acquire);
     if (t)
       t->visit_nodes(vtor);

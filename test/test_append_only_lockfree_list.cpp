@@ -198,6 +198,29 @@ TEST("erase_if [basic]") {
   REQUIRE(list.empty());
 }
 
+TEST("const_iterator [basic]") {
+  using T = append_only_lockfree_list<int>;
+  T list;
+  list.push_back(5);
+  T::iterator it = list.begin();
+  T::const_iterator cit = it;
+  T::iterator _ = cit;
+  REQUIRE(it == cit);
+  REQUIRE(cit == it);
+  REQUIRE(it == _);
+  auto& cv = *cit;
+  auto& v = *it;
+  REQUIRE(cv == v);
+  static_assert(std::is_same_v<decltype(cv), const int&>);
+  using I1 = std::iterator_traits<T::const_iterator>;
+  using I2 = std::iterator_traits<std::vector<int>::const_iterator>;
+  static_assert(std::is_same_v<I1::pointer, I2::pointer>);
+  static_assert(std::is_same_v<I1::reference, I2::reference>);
+  static_assert(std::is_same_v<I1::value_type, I2::value_type>);
+  static_assert(std::forward_iterator<T::iterator>);
+  static_assert(std::forward_iterator<T::const_iterator>);
+}
+
 // =====================================================================
 // Часть 2: многопоточные тесты
 // =====================================================================
