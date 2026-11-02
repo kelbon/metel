@@ -13,13 +13,13 @@ template <typename T>
 inline constexpr bool is_decayed_v = std::is_same_v<T, std::decay_t<T>>;
 
 enum { VISIT_INDEX_MAX = 128 - 1 };
-// switch 'i' up to 64 for better code generatrion
-// 'F' should be like [] <size_t I> {}
-// Max - index until 'f' will be instanciated, assumes i <= MAX
+
+namespace noexport {
+
 template <size_t Max>
-constexpr decltype(auto) visit_index(auto&& f, size_t i) {
+constexpr decltype(auto) visit_index_switch(auto&& f, size_t i) {
   static_assert(Max <= VISIT_INDEX_MAX);
-  assert(i <= VISIT_INDEX_MAX);
+  assert(i <= Max);
   switch (i) {
 #define $METEL_SWITCH_CASE(INDEX)            \
   case INDEX: {                              \
@@ -45,6 +45,33 @@ constexpr decltype(auto) visit_index(auto&& f, size_t i) {
 #undef $METEL_SWITCH_CASE16
 #undef $METEL_SWITCH_CASE32
 #undef $METEL_SWITCH_CASE64
+#undef $METEL_SWITCH_CASE128
+}
+
+template <size_t Offset, size_t Max>
+constexpr decltype(auto) visit_index_from(auto&& f, size_t i) {
+  auto shifted = [&]<size_t I>() -> decltype(auto) { return f.template operator()<Offset + I>(); };
+  if constexpr (Max - Offset <= VISIT_INDEX_MAX) {
+    return visit_index_switch<Max - Offset>(shifted, i - Offset);
+  } else {
+    if (i - Offset <= VISIT_INDEX_MAX)
+      return visit_index_switch<VISIT_INDEX_MAX>(shifted, i - Offset);
+    return visit_index_from<Offset + VISIT_INDEX_MAX + 1, Max>(f, i);
+  }
+}
+
+}  // namespace noexport
+
+// switch 'i' for better code generatrion
+// 'F' should be like [] <size_t I> {}
+// Max - index until 'f' will be instanciated, assumes i <= MAX
+template <size_t Max>
+constexpr decltype(auto) visit_index(auto&& f, size_t i) {
+  assert(i <= Max);
+  if constexpr (Max <= VISIT_INDEX_MAX)
+    return noexport::visit_index_switch<Max>(f, i);
+  else
+    return noexport::visit_index_from<0, Max>(f, i);
 }
 
 template <typename... Foos>
